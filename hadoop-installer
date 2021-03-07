@@ -1,0 +1,70 @@
+#!/bin/bash
+
+###################################################################
+#Script Name	: One Step Hadoop Installer                                                                                              
+#Description	: The purpose of this script was to make hadoop installation more intuitive                                                                                 
+#Author       	: contact@mdsameer.com.np
+###################################################################
+
+echo "** Enter a preferred username to continue hadoop installation ***"
+read u
+echo "** Okay, let us update your system repo first and install required dependencies... this may take a while..."
+sudo apt update; sudo apt install default-jdk openssh-client openssh-server -y;
+sudo useradd -m -G sudo -s $SHELL $u
+# Most used vars
+p="/home/$u"
+sudo -u $u ssh-keygen -t rsa -P "" -f $p/.ssh/id_rsa
+sudo su $u -c "cat $p/.ssh/id_rsa.pub > $p/.ssh/authorized_keys"
+wget https://downloads.apache.org/hadoop/common/hadoop-3.2.2/hadoop-3.2.2.tar.gz
+tar xvzf hadoop-3.2.2.tar.gz
+sudo mv -v hadoop-3.2.2 $p/.
+sudo chown -R $u:$u $p/hadoop-3.2.2
+sudo chmod o+w $p/.bashrc $p/hadoop-3.2.2/etc/hadoop/hadoop-env.sh $p/hadoop-3.2.2/etc/hadoop/yarn-site.xml $p/hadoop-3.2.2/etc/hadoop/hdfs-site.xml
+echo -e '\n\n #Hadoop Variable START \n export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64 \n export HADOOP_HOME='$p'/hadoop-3.2.2 \n export HADOOP_INSTALL=$HADOOP_HOME \n export HADOOP_MAPRED_HOME=$HADOOP_HOME \n export HADOOP_COMMON_HOME=$HADOOP_HOME \n export HADOOP_HDFS_HOME=$HADOOP_HOME \n export YARN_HOME=$HADOOP_HOME \n export HADOOP_COMMON_LIB_NATIVE_DIR=$HADOOP_HOME/lib/native \n export PATH=$PATH:$HADOOP_HOME/sbin/:$HADOOP_HOME/bin \n export HADOOP_OPTS=-Djava.library.path=$HADOOP_HOME/lib/native \n #Hadoop Variable END\n\n' >> $p/.bashrc
+source $p/.bashrc
+echo "export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64" >> $p/hadoop-3.2.2/etc/hadoop/hadoop-env.sh
+sudo sed -i '/<configuration>/a <property>\n\t\t<name>hadoop.tmp.dir</name>\n\t\t<value>'$p'/hadoop-3.2.2/app/hadoop/tmp</value>\n</property>\n<property>\n\t\t<name>fs.default.name</name>\n\t\t<value>hdfs://127.0.0.1:9000</value>\n</property>' $p/hadoop-3.2.2/etc/hadoop/core-site.xml
+sudo sed -i '/<configuration>/a <property>\n\t\t <name>mapreduce.framework.name</name>\n\t\t <value>yarn</value>\n</property>' $p/hadoop-3.2.2/etc/hadoop/mapred-site.xml
+echo "<configuration>
+<property>
+<name>yarn.nodemanager.aux-services</name>
+<value>mapreduce_shuffle</value>
+</property>
+<property>
+<name>yarn.nodemanager.aux-services.mapreduce.shuffle.class</name>
+<value>org.apache.hadoop.mapred.ShuffleHandler</value>
+</property>
+<property>
+<name>yarn.resourcemanager.hostname</name>
+<value>127.0.0.1</value>
+</property>
+<property>
+<name>yarn.acl.enable</name>
+<value>0</value>
+</property>
+<property>
+<name>yarn.nodemanager.env-whitelist</name>   
+<value>JAVA_HOME,HADOOP_COMMON_HOME,HADOOP_HDFS_HOME,HADOOP_CONF_DIR,CLASSPATH_PERPEND_DISTCACHE,HADOOP_YARN_HOME,HADOOP_MAPRED_HOME</value>
+</property>
+</configuration>" > $p/hadoop-3.2.2/etc/hadoop/yarn-site.xml
+echo "<configuration>
+<property>
+<name>dfs.data.dir</name>
+<value>'$p'/hadoop-3.2.2/dfsdata/namenode</value>
+</property>
+<property>
+<name>dfs.data.dir</name>
+<value>'$p'/hadoop-3.2.2/dfsdata/datanode</value>
+</property>
+<property>
+<name>dfs.replication</name>
+<value>1</value>
+</property>
+</configuration>" > $p/hadoop-3.2.2/etc/hadoop/hdfs-site.xml
+sudo -u $u $p/hadoop-3.2.2/bin/hdfs namenode -format
+cd $p/hadoop-3.2.2/sbin
+sudo -u $u ./start-dfs.sh
+sudo -u $u ./start-yarn.sh
+sudo chmod o-w $p/.bashrc $p/hadoop-3.2.2/etc/hadoop/hadoop-env.sh $p/hadoop-3.2.2/etc/hadoop/yarn-site.xml $p/hadoop-3.2.2/etc/hadoop/hdfs-site.xml
+echo "********** Hadoop Installation Success ************"
+sudo su $u
